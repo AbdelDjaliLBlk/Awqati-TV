@@ -1,12 +1,13 @@
 // lib/core/constants/app_constants.dart
-// Central constants for the Noor application
+// Central constants for the Awqati application
 
 class AppConstants {
   AppConstants._();
 
   // App Info
-  static const String appName = 'Noor';
-  static const String appNameAr = 'نور';
+  static const String appName = 'Awqati';
+  static const String appNameAr = 'أوقاتي';
+
   static const String appVersion = '1.0.0';
 
   // Hive Box Names

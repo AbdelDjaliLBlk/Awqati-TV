@@ -1,5 +1,6 @@
-name: noor_app
-description: Noor - Islamic Smart Display Application
+name: awqati_app
+description: Awqati - Islamic Smart Display Application
+
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -62,7 +63,7 @@ dependencies:
   hijri: ^2.0.1
 
   # TV focus
-  focusable_control_builder: ^2.2.0
+  focusable_control_builder: ^1.2.0
 
 dev_dependencies:
   flutter_test:
@@ -92,3 +93,4 @@ flutter:
         - asset: assets/fonts/ScheherazadeNew-Regular.ttf
         - asset: assets/fonts/ScheherazadeNew-Bold.ttf
           weight: 700
+

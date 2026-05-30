@@ -1,5 +1,6 @@
 // lib/main.dart
-// Noor App - Islamic Smart Display Application
+// Awqati App - Islamic Smart Display Application
+
 // Entry point and app initialization
 
 import 'package:flutter/material.dart';
@@ -38,14 +39,16 @@ Future<void> main() async {
   );
 
   runApp(
-    const ProviderScope(
-      child: NoorApp(),
+        const ProviderScope(
+      child: AwqatiApp(),
     ),
+
   );
 }
 
-class NoorApp extends ConsumerWidget {
-  const NoorApp({super.key});
+class AwqatiApp extends ConsumerWidget {
+  const AwqatiApp({super.key});
+
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,8 +68,9 @@ class NoorApp extends ConsumerWidget {
         themeMode = ThemeMode.dark;
     }
 
-    return MaterialApp.router(
-      title: 'Noor - نور',
+        return MaterialApp.router(
+      title: 'Awqati - أوقاتي',
+
       debugShowCheckedModeBanner: false,
 
       // Theming
