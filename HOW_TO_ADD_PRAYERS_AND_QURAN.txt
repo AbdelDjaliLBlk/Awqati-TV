@@ -1,0 +1,464 @@
+=============================================================
+  HOW TO ADD REAL-TIME PRAYER TIMES & FULL QURAN TO NOOR APP
+  A Practical Step-by-Step Integration Guide
+=============================================================
+
+PART 1 — REAL-TIME PRAYER TIMES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The app already includes an offline prayer calculation engine
+using the `adhan` package. This section explains how to
+upgrade it to real-time GPS detection + background athan.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — ADD ANDROID PERMISSIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Open: android/app/src/main/AndroidManifest.xml
+
+Add these lines INSIDE <manifest> but OUTSIDE <application>:
+
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.VIBRATE"/>
+
+INSIDE <application>:
+
+  <service
+      android:name="com.ryanheise.audioservice.AudioService"
+      android:foregroundServiceType="mediaPlayback"
+      android:exported="true">
+      <intent-filter>
+          <action android:name="android.media.browse.MediaBrowserService"/>
+      </intent-filter>
+  </service>
+
+  <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+      android:exported="true">
+      <intent-filter>
+          <action android:name="android.intent.action.MEDIA_BUTTON"/>
+      </intent-filter>
+  </receiver>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — ENABLE GPS TRACKING IN PRAYER PROVIDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The prayer_provider.dart already handles GPS. To enable
+continuous location updates (for moving users / TV setup):
+
+Open: lib/features/prayer/presentation/providers/prayer_provider.dart
+
+Add inside PrayerTimesNotifier class:
+
+  StreamSubscription<Position>? _locationStream;
+
+  void _startLocationTracking() {
+    _locationStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        distanceFilter: 5000, // only recalculate if moved 5km
+      ),
+    ).listen((position) {
+      _calculatePrayers(
+        position.latitude,
+        position.longitude,
+        state.cityName,
+      );
+    });
+  }
+
+Call _startLocationTracking() from _initialize().
+
+Add to dispose():
+  _locationStream?.cancel();
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — WIRE ATHAN TRIGGER TO NAVIGATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+In lib/main.dart (or a RootWatcher widget), add:
+
+  class RootWatcher extends ConsumerWidget {
+    final Widget child;
+    const RootWatcher({super.key, required this.child});
+
+    @override
+    Widget build(BuildContext context, WidgetRef ref) {
+      // Wire athan trigger
+      ref.listen(prayerProvider, (prev, next) {
+        // Nothing here — callback set below
+      });
+
+      // Set callback once
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final prayerNotifier = ref.read(prayerProvider.notifier);
+        prayerNotifier.onPrayerTime = (prayerEn, prayerAr) async {
+          // 1. Play athan audio
+          await ref.read(athanProvider.notifier).playAthan(prayerEn, prayerAr);
+          // 2. Navigate to fullscreen athan
+          if (context.mounted) {
+            context.push('/athan?prayer=$prayerEn');
+          }
+        };
+      });
+
+      return child;
+    }
+  }
+
+Wrap your GoRouter's builder output with RootWatcher:
+
+  builder: (context, state, child) {
+    return RootWatcher(child: MainShell(child: child));
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4 — ADD BACKGROUND ATHAN (WHEN APP IS CLOSED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Add to pubspec.yaml dependencies:
+  workmanager: ^0.5.2
+
+Create lib/core/services/background_service.dart:
+
+  import 'package:workmanager/workmanager.dart';
+  import 'package:adhan/adhan.dart';
+
+  void callbackDispatcher() {
+    Workmanager().executeTask((task, inputData) async {
+      // Recalculate prayer times
+      final lat = inputData?['lat'] ?? 21.3891;
+      final lng = inputData?['lng'] ?? 39.8579;
+      final coords = Coordinates(lat, lng);
+      final params = CalculationMethod.muslim_world_league.getParameters();
+      final times = PrayerTimes.today(coords, params);
+
+      // Check if any prayer is within the next 5 minutes
+      final now = DateTime.now();
+      final prayers = [times.fajr, times.dhuhr, times.asr, times.maghrib, times.isha];
+      for (final t in prayers) {
+        final diff = t.difference(now).inMinutes;
+        if (diff >= 0 && diff < 2) {
+          // Trigger notification
+          await _showAthanNotification();
+        }
+      }
+      return Future.value(true);
+    });
+  }
+
+  Future<void> initBackgroundService() async {
+    await Workmanager().initialize(callbackDispatcher);
+    await Workmanager().registerPeriodicTask(
+      'prayer-check',
+      'checkPrayerTimes',
+      frequency: const Duration(minutes: 15),
+    );
+  }
+
+Call initBackgroundService() from main() after Hive.initFlutter().
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 — CHANGE CALCULATION METHOD DYNAMICALLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+In Settings screen, when user picks a new method:
+  ref.read(settingsProvider.notifier).setCalculationMethod('UmmAlQura');
+
+This triggers a settings state rebuild. To auto-recalculate:
+In prayer_provider.dart, listen to settings changes:
+
+  @override
+  void _initialize() async {
+    await _loadLocation();
+    _startCountdownTimer();
+    _startAthanChecker();
+
+    // Re-calculate when method changes
+    ref.listen(settingsProvider, (prev, next) {
+      if (prev?.calculationMethod != next.calculationMethod ||
+          prev?.madhab != next.madhab) {
+        recalculate();
+      }
+    });
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PART 2 — ADDING FULL QURAN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The app fetches Quran text from AlQuran.cloud API. This
+section shows how to enable FULLY OFFLINE Quran and add
+professional recitation audio.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6 — DOWNLOAD & BUNDLE OFFLINE QURAN JSON
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Option A — Full Arabic Quran JSON (2.5MB):
+
+  curl "https://api.alquran.cloud/v1/quran/quran-uthmani" \
+    -o assets/quran/quran_arabic.json
+
+Option B — Arabic + English in one file (5MB):
+
+  curl "https://api.alquran.cloud/v1/quran/en.sahih" \
+    -o assets/quran/quran_english.json
+
+After downloading, add to pubspec.yaml assets section:
+  - assets/quran/quran_arabic.json
+  - assets/quran/quran_english.json
+
+Then update quran_provider.dart _loadSurah() to load from
+assets first:
+
+  Future<void> loadSurah(int surahNumber, {bool withTranslation = false}) async {
+    // Try local JSON first
+    try {
+      final jsonStr = await rootBundle.loadString('assets/quran/quran_arabic.json');
+      final data = json.decode(jsonStr);
+      final surahs = data['data']['surahs']['references'] as List;
+      // Parse and return...
+      return;
+    } catch (_) {
+      // Fall through to API
+    }
+    // ... existing API code
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 7 — CACHE AUDIO AFTER FIRST PLAY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Add to pubspec.yaml:
+  flutter_cache_manager: ^3.3.1
+  path_provider: ^2.1.2
+
+Create lib/features/quran/data/services/quran_audio_cache.dart:
+
+  import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+
+  class QuranAudioCache {
+    static const _cacheKey = 'quran_audio';
+    static final CacheManager _manager = CacheManager(
+      Config(_cacheKey, maxNrOfCacheObjects: 200),
+    );
+
+    static Future<String> getAyahAudioPath(int globalAyahNumber) async {
+      final url = 'https://cdn.islamic.network/quran/audio/128/ar.alafasy/$globalAyahNumber.mp3';
+      final file = await _manager.getSingleFile(url);
+      return file.path;
+    }
+
+    static Future<void> preloadSurah(List<int> ayahNumbers) async {
+      for (final n in ayahNumbers) {
+        unawaited(getAyahAudioPath(n));
+      }
+    }
+  }
+
+In surah_reader_screen.dart, replace _toggleAyahAudio():
+
+  Future<void> _toggleAyahAudio(Ayah ayah) async {
+    if (_playingAyah == ayah.numberInSurah) {
+      await _audioPlayer.stop();
+      setState(() => _playingAyah = null);
+      return;
+    }
+    setState(() => _playingAyah = ayah.numberInSurah);
+    try {
+      final path = await QuranAudioCache.getAyahAudioPath(ayah.number);
+      await _audioPlayer.setFilePath(path);
+      await _audioPlayer.play();
+    } catch (e) {
+      final url = 'https://cdn.islamic.network/quran/audio/128/ar.alafasy/${ayah.number}.mp3';
+      await _audioPlayer.setUrl(url);
+      await _audioPlayer.play();
+    }
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 8 — ADD QURAN SEARCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The AlQuran.cloud API supports search:
+
+  GET https://api.alquran.cloud/v1/search/{keyword}/all/ar
+
+In quran_provider.dart, add:
+
+  Future<List<Ayah>> searchQuran(String query) async {
+    final response = await http.get(
+      Uri.parse('https://api.alquran.cloud/v1/search/$query/all/ar'),
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final matches = data['data']['matches'] as List;
+      return matches.map((m) => Ayah.fromJson(m)).toList();
+    }
+    return [];
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 9 — ADD JUZ (PARA) NAVIGATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Add to quran_screen.dart a second tab "Juz":
+
+  static const List<Map<String, dynamic>> juzList = [
+    {'juz': 1, 'surah': 1, 'ayah': 1, 'name': 'الم'},
+    {'juz': 2, 'surah': 2, 'ayah': 142, 'name': 'سيقول'},
+    // ... all 30 juz
+  ];
+
+  // On tap: navigate to the starting surah/ayah
+  context.push('/quran/surah/${juz['surah']}?ayah=${juz['ayah']}');
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 10 — ADD CONTINUOUS SURAH PLAYBACK (AUTO-ADVANCE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+In surah_reader_screen.dart, modify the player state listener:
+
+  _audioPlayer.playerStateStream.listen((playerState) {
+    if (playerState.processingState == ProcessingState.completed) {
+      if (_playingAyah != null) {
+        final content = ref.read(quranProvider).currentSurahContent;
+        if (content != null) {
+          final nextIndex = _playingAyah!; // _playingAyah is 1-based numberInSurah
+          if (nextIndex < content.ayahs.length) {
+            // Auto play next ayah
+            _toggleAyahAudio(content.ayahs[nextIndex]);
+            // Scroll to ayah
+            _scrollToAyah(nextIndex);
+          } else {
+            setState(() => _playingAyah = null);
+          }
+        }
+      }
+    }
+  });
+
+  void _scrollToAyah(int index) {
+    final itemHeight = 150.0; // approximate
+    _scrollController.animateTo(
+      index * itemHeight,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 11 — CHANGE RECITER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Available reciters on cdn.islamic.network:
+
+  Mishary Alafasy:   ar.alafasy
+  Abdul Basit:       ar.abdulbasitmurattal
+  Maher Al Muaiqly: ar.mahermuaiqly
+  Al Husary:         ar.husary
+  Abu Bakr Shatri:   ar.shaatree
+
+Add reciter selection to Settings:
+  final reciters = {
+    'ar.alafasy': 'Mishary Alafasy',
+    'ar.abdulbasitmurattal': 'Abdul Basit',
+    'ar.mahermuaiqly': 'Maher Al Muaiqly',
+  };
+
+Save selected reciter in AppSettings.quranReciter.
+
+Update audio URL builder:
+  final url = 'https://cdn.islamic.network/quran/audio/128/$reciter/${ayah.number}.mp3';
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 3 — QUICK REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+KEY API ENDPOINTS
+
+  Prayer API (Aladhan.com — alternative):
+    GET https://api.aladhan.com/v1/timings/{timestamp}?latitude={lat}&longitude={lng}&method={1-23}
+
+  Quran text:
+    GET https://api.alquran.cloud/v1/surah/{number}
+    GET https://api.alquran.cloud/v1/surah/{number}/en.sahih
+    GET https://api.alquran.cloud/v1/quran/quran-uthmani   (full Quran)
+
+  Quran audio CDN:
+    https://cdn.islamic.network/quran/audio/128/{reciter}/{globalAyahNumber}.mp3
+
+  Quran search:
+    GET https://api.alquran.cloud/v1/search/{keyword}/all/ar
+
+CALCULATION METHOD NUMBERS (Aladhan API)
+  1  = University of Islamic Sciences, Karachi
+  2  = Islamic Society of North America (ISNA)
+  3  = Muslim World League
+  4  = Umm Al-Qura, Makkah
+  5  = Egyptian General Authority of Survey
+  15 = Gulf Region
+  16 = Kuwait
+
+ADHAN PACKAGE METHOD NAMES
+  CalculationMethod.muslim_world_league
+  CalculationMethod.umm_al_qura
+  CalculationMethod.egyptian
+  CalculationMethod.north_america   (ISNA)
+  CalculationMethod.karachi
+
+PRAYER INDEX MAPPING
+  0 = Fajr    (الفجر)
+  1 = Sunrise (الشروق)  ← no athan
+  2 = Dhuhr   (الظهر)
+  3 = Asr     (العصر)
+  4 = Maghrib (المغرب)
+  5 = Isha    (العشاء)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TROUBLESHOOTING
+
+Problem: Prayer times are off by 1-2 minutes
+Solution: Check timezone. Use DateTime.now() not UTC.
+         Confirm calculation method matches your region.
+
+Problem: GPS not working on TV
+Solution: TV has no GPS. App falls back to cached location.
+         Add a manual city search feature in Settings:
+           GET https://api.aladhan.com/v1/timingsByCity?city=Cairo&country=Egypt
+
+Problem: Audio not playing on TV
+Solution: TV audio routing differs. Ensure AudioService is
+         registered in AndroidManifest and use AudioFocus.
+
+Problem: Athan triggers multiple times
+Solution: Add a "last athan played" timestamp check:
+         if (now.difference(_lastAthanTime).inMinutes < 10) return;
+         _lastAthanTime = now;
+
+Problem: Quran text renders incorrectly (disconnected letters)
+Solution: Ensure ScheherazadeNew font is correctly bundled
+         and pubspec.yaml references it. Use textDirection: TextDirection.rtl
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FONT DOWNLOAD LINKS
+
+Amiri (Arabic UI + Body):
+  https://fonts.google.com/specimen/Amiri
+  Files needed: Amiri-Regular.ttf, Amiri-Bold.ttf
+
+Scheherazade New (Quran text):
+  https://fonts.google.com/specimen/Scheherazade+New
+  Files: ScheherazadeNew-Regular.ttf, ScheherazadeNew-Bold.ttf
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+END OF GUIDE
+=============================================================
