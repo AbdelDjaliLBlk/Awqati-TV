@@ -13,7 +13,6 @@ import '../../../../core/widgets/tv_focus_widget.dart';
 import '../../../prayer/presentation/providers/prayer_provider.dart';
 import '../../../prayer/data/models/prayer_models.dart';
 import '../../../settings/presentation/providers/settings_provider.dart';
-import '../../../quran/data/models/quran_models.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});

@@ -421,7 +421,7 @@ class _SettingTileSwitch extends StatelessWidget {
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.gold,
+          activeThumbColor: AppColors.gold,
         ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),

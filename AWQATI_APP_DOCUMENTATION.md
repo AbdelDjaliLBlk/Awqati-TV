@@ -1,4 +1,4 @@
-# Noor — Islamic Smart Display App
+# Awqati-TV — Islamic Smart Display App
 ## Complete Architecture & Developer Documentation
 
 ---
@@ -74,24 +74,32 @@ Data Layer           →   Services, Models, Repositories
 ## 3. Folder Structure
 
 ```
-noor_app/
+awqati_app/
 ├── lib/
-│   ├── main.dart                        # App entry + ProviderScope
-│   ├── core/
+│   ├── main.dart                       # Entry point
+│   ├── core/                           # Shared infrastructure
 │   │   ├── constants/
-│   │   │   └── app_constants.dart       # All app-wide constants
-│   │   ├── theme/
-│   │   │   └── app_theme.dart           # Dark/light themes, colors, typography
+│   │   │   └── app_constants.dart
 │   │   ├── router/
-│   │   │   └── app_router.dart          # GoRouter config + route paths
+│   │   │   └── app_router.dart         # GoRouter configuration
+│   │   ├── theme/
+│   │   │   └── app_theme.dart          # Light/Dark themes
 │   │   ├── utils/
-│   │   │   ├── date_utils.dart          # Gregorian + Hijri formatting
-│   │   │   └── platform_utils.dart      # TV detection, breakpoints
+│   │   │   ├── date_utils.dart
+│   │   │   └── platform_utils.dart     # TV vs Phone detection
 │   │   └── widgets/
-│   │       ├── main_shell.dart          # Adaptive nav shell
-│   │       ├── tv_focus_widget.dart     # TV remote focusable wrappers
-│   │       └── islamic_background.dart  # Stars, geometric patterns
-│   └── features/
+│   │       ├── islamic_background.dart
+│   │       ├── main_shell.dart         # BottomNav/SideNav shell
+│   │       └── tv_focus_widget.dart
+│   └── features/                       # Feature-based modules
+│       ├── athan/
+│       │   ├── data/services/athan_service.dart
+│       │   └── presentation/screens/athan_screen.dart
+│       ├── azkar/
+│       │   ├── data/models/azkar_models.dart
+│       │   └── presentation/screens/
+│       │       ├── azkar_screen.dart
+│       │       └── azkar_detail_screen.dart
 │       ├── dashboard/
 │       │   └── presentation/screens/dashboard_screen.dart
 │       ├── prayer/
@@ -101,9 +109,6 @@ noor_app/
 │       │   └── presentation/
 │       │       ├── providers/prayer_provider.dart
 │       │       └── screens/prayer_screen.dart
-│       ├── athan/
-│       │   ├── data/services/athan_service.dart
-│       │   └── presentation/screens/athan_screen.dart
 │       ├── quran/
 │       │   ├── data/models/quran_models.dart
 │       │   └── presentation/
@@ -111,26 +116,13 @@ noor_app/
 │       │       └── screens/
 │       │           ├── quran_screen.dart
 │       │           └── surah_reader_screen.dart
-│       ├── azkar/
-│       │   ├── data/models/azkar_models.dart
-│       │   └── presentation/screens/
-│       │       ├── azkar_screen.dart
-│       │       └── azkar_detail_screen.dart
 │       └── settings/
 │           └── presentation/
 │               ├── providers/settings_provider.dart
 │               └── screens/settings_screen.dart
-├── assets/
-│   ├── audio/           # athan_mecca.mp3, athan_madinah.mp3, etc.
-│   ├── fonts/           # Amiri-Regular.ttf, ScheherazadeNew-Regular.ttf
-│   ├── images/          # Backgrounds, icons
-│   └── quran/           # Optional offline Quran JSON
-├── android/
-│   ├── app/src/main/AndroidManifest.xml
-│   └── app/src/main/res/xml/leanback_channels.xml
-└── pubspec.yaml
-```
-
+├── assets/                             # Images, Fonts, Audio, Quran data
+├── pubspec.yaml                        # Dependencies & App Config
+└── analysis_options.yaml               # Linting rules
 ---
 
 ## 4. Core Layer
@@ -283,7 +275,7 @@ Settings → ThemeMode → `MaterialApp.router(themeMode: ...)` re-renders whole
 
 ### Detection Chain
 ```dart
-1. MethodChannel 'noor_app/platform' → isAndroidTV (native check)
+1. MethodChannel 'awqati_app/platform' → isAndroidTV (native check)
 2. Fallback: screen shortestSide > 600 && aspectRatio > 1.6
 3. Breakpoints.isTV(context) used throughout
 ```
@@ -533,7 +525,7 @@ dart --version           # Should be >= 3.2.0
 ### Setup
 ```bash
 git clone <repo>
-cd noor_app
+cd awqati_app
 flutter pub get
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
@@ -651,4 +643,4 @@ flutter build web --release
 
 ---
 
-*Noor App — Built with Flutter • Powered by faith*
+*Awqati App — Built with Flutter • Powered by faith*

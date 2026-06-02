@@ -1,5 +1,5 @@
 =============================================================
-  HOW TO ADD REAL-TIME PRAYER TIMES & FULL QURAN TO NOOR APP
+  HOW TO ADD REAL-TIME PRAYER TIMES & FULL QURAN TO AWQATI APP
   A Practical Step-by-Step Integration Guide
 =============================================================
 

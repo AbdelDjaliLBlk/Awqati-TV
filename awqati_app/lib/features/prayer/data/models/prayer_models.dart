@@ -1,7 +1,6 @@
 // lib/features/prayer/data/models/prayer_models.dart
 // Prayer time data models
 
-import 'package:adhan/adhan.dart';
 
 enum PrayerIndex {
   fajr(0),

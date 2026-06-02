@@ -182,11 +182,9 @@ class AppTheme {
         primary: AppColors.gold,
         secondary: AppColors.emerald,
         surface: AppColors.surface,
-        background: AppColors.deepNight,
         onPrimary: AppColors.deepNight,
         onSecondary: AppColors.deepNight,
         onSurface: AppColors.textPrimary,
-        onBackground: AppColors.textPrimary,
         tertiary: AppColors.teal,
         error: Color(0xFFE74C3C),
       ),
@@ -197,7 +195,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         iconTheme: IconThemeData(color: AppColors.gold),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -244,11 +242,9 @@ class AppTheme {
         primary: AppColors.goldDark,
         secondary: AppColors.emeraldDark,
         surface: AppColors.lightSurface,
-        background: AppColors.lightBackground,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: AppColors.lightTextPrimary,
-        onBackground: AppColors.lightTextPrimary,
       ),
       textTheme: _buildTextTheme(false),
       appBarTheme: const AppBarTheme(
@@ -257,7 +253,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         iconTheme: IconThemeData(color: AppColors.goldDark),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.lightSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(

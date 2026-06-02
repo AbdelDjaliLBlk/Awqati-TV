@@ -506,7 +506,7 @@ class _PrayerCardContent extends StatelessWidget {
       case PrayerIndex.asr:
         return Icons.wb_cloudy_outlined;
       case PrayerIndex.maghrib:
-        return Icons.wb_sunset_outlined;
+        return Icons.nights_stay;
       case PrayerIndex.isha:
         return Icons.nightlight_round;
     }

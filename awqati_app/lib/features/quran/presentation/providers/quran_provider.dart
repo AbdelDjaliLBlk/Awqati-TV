@@ -2,6 +2,7 @@
 // Quran data fetching and state management
 
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../data/models/quran_models.dart';
@@ -184,3 +185,17 @@ class QuranNotifier extends StateNotifier<QuranState> {
 final quranProvider = StateNotifierProvider<QuranNotifier, QuranState>(
   (ref) => QuranNotifier(ref),
 );
+
+Future<void> loadSurah(int surahNumber, {bool withTranslation = false}) async {
+    // Try local JSON first
+    try {
+      final jsonStr = await rootBundle.loadString('assets/quran/quran_arabic.json');
+      final data = json.decode(jsonStr);
+      final surahs = data['data']['surahs']['references'] as List;
+      // Parse and return...
+      return;
+    } catch (_) {
+      // Fall through to API
+    }
+    // ... existing API code
+  }
