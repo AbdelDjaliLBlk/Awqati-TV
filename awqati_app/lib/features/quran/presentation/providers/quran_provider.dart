@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../data/models/quran_models.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../settings/presentation/providers/settings_provider.dart';
 
 class QuranNotifier extends StateNotifier<QuranState> {
   final Ref _ref;
